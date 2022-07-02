@@ -12,6 +12,10 @@ Scripts/
 share/
 *.cfg
 
+*.cpp
+*.h
+*.hpp
+
 # non of these
 autograder.py
 test_cases/

@@ -15,6 +15,8 @@ from model_detection import Model
 from model_detection import kalman_filter
 from model_detection import pnp_detection
 from model_detection import robust_matcher
+from model_detection import Mesh
+import time
 
 def kalman_filter_params(n_states, n_measurements, n_inputs, dt):
     """
@@ -35,14 +37,19 @@ if __name__ == "__main__":
     print("Started....")
     
     video_source = "data/video.mp4"
+    model_path = "./data/test/cookies_ORB.yml"
+    mesh_path = "./data/test/box.ply"
     # load the model
-    model = Model.loadModel("data/model.yml")
+    print("Parsing and registering model/mesh....")
+
+    model = Model.loadModel(model_path)
     keypoints_model = model.getKeypoints()
     descriptors_model = model.getDescriptors()
     model_3d_points = model.get3DPoints()
-
     # load mesh
-    mesh = util.load_mesh("data/mesh.ply")
+    mesh = Mesh.loadMesh(mesh_path)
+
+    print("Model/Mesh registration is done")
 
     # intrinsic camera parameters
     # fx, fy, cx, cy
@@ -82,6 +89,7 @@ if __name__ == "__main__":
         exit()
 
     while True:
+        start_time = time.time()
         # Capture frame-by-frame
         ret, frame = cap.read()
         # if frame is read correctly ret is True
@@ -97,7 +105,7 @@ if __name__ == "__main__":
         points_3d_matches = model_3d_points[ matches ]
 
         # draw outliers
-        util.draw_points( frame, points_2d_matches, color="red")
+        util.drawPoints( frame, points_2d_matches, color="red")
         
         # at least 4 matches are required for ransac estimation
         if len(matches) >= 4:
@@ -108,7 +116,7 @@ if __name__ == "__main__":
 
             inlier_2d_points = points_2d_matches[ inliers ]
             # draw the inliers
-            util.draw_points( frame, inlier_2d_points, color="green" )
+            util.drawPoints( frame, inlier_2d_points, color="green" )
 
             # step 5
             # kalman filter 
@@ -135,17 +143,18 @@ if __name__ == "__main__":
 
         util.draw3DCoordinateAxes(frame, pose_points2d)
 
-        util.drawObjectMesh(frame, mesh, pnp_est)
+        util.drawObjectMesh(frame, mesh, pnp_est, color="yellow")
 
         # step BONUS: render some 3d figure on the reconstructed mesh
-        # s.t ball
+        # s.t ball rolling
         # TODO
 
         # DEBUG information
-        fps =0
+        fps = 1.0 / (time.time() -start_time)
         print("frame number:", frame_number)
         print("fps rate:", fps)
         print("inliers count:", len(inliers))
+        print("##################################")
 
         frame_number += 1
 

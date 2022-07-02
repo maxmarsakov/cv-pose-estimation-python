@@ -2,39 +2,54 @@
 model class
 for loading textured model
 """
+import cv2 as cv
+import numpy as np
 
 class Model:
 
-    def __init__(self, keypoints, descriptors) -> None:
+    def __init__(self, points3d, keypoints, descriptors) -> None:
 
         self.keypoints_ = keypoints
         self.descriptors_ = descriptors
+        self.points_3d_ = points3d
 
     def getKeypoints(self):
-
-        pass
+        """
+        keypoints
+        """
+        return self.keypoints_
 
     
     def getDescriptors(self):
         """
         list of descritors of each 3d coordinate
         """
-        pass
+        return self.descriptors_
 
     def get3DPoints(self):
         """
         list of 3d model coordinates
         """
-        pass
+        return self.points_3d_
 
     @staticmethod
-    def loadModel(path:str):
+    def loadModel(filename:str):
         """
         load model from the path
-        TODO
         """
-        keypoints = None
-        descriptors = None
+        s = cv.FileStorage(filename, cv.FileStorage_READ)
+        points_3d = s.getNode("points_3d").mat()
+        points_3d = points_3d.reshape( points_3d.shape[0], points_3d.shape[-1] )
+        descriptors = s.getNode("descriptors").mat()
+        # parse keypoints
+        parsed_keypoints  = np.zeros( (0, 7) , dtype=np.float32)
+        if not s.getNode("keypoints").empty():
+            keypoints = s.getNode("keypoints")
+            m = keypoints.size()
+            parsed_keypoints = np.zeros( (m) , dtype=np.float32)
+            for k in range(m):
+                parsed_keypoints[k] = keypoints.at(k).real()
+            parsed_keypoints = parsed_keypoints.reshape(int(m)//7, 7)
+        s.release()
 
-        return Model(keypoints, descriptors)
-    
+        return Model(points_3d, parsed_keypoints, descriptors)

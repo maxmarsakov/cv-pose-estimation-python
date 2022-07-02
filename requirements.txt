@@ -2,3 +2,5 @@ opencv-python
 numpy
 imutils
 matplotlib
+pyyaml
+jupyter
