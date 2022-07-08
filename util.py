@@ -45,7 +45,8 @@ def drawPoints(frame, points_2d, color:str):
     draws points on the frame image
     """  
     for point in points_2d:
-        cv.circle(frame, point, radius=RADIUS, color=COLORS[color], thickness=-1 )
+        #print(point)
+        cv.circle(frame, (int(point[0]),int(point[1])), radius=RADIUS, color=COLORS[color], thickness=-1 )
 
 def draw2DPoints(frame, points_2d, points_3d, color:str):
     """

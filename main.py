@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     print("Started....")
     
-    video_source = "data/video.mp4"
+    video_source = "./data/test/box.mp4"
     model_path = "./data/test/cookies_ORB.yml"
     mesh_path = "./data/test/box.ply"
     # load the model
@@ -68,7 +68,8 @@ if __name__ == "__main__":
 
     # initalize matcher
     ratio_test = 0.7 # some default value
-    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="orb" )
+    # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
+    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", matcher="BF", use_cross_check=False  )
 
     # ransac parameters
     ransac_confidence = 0.99
@@ -98,15 +99,24 @@ if __name__ == "__main__":
             break
 
         # step 1 - match the points between the model and the frame
-        matches, keypoints_scene = matcher.fastMatch(frame, keypoints_model, descriptors_model)
+        matches, kp_frame = matcher.fastMatch(frame, keypoints_model, descriptors_model)
     
         # step 2 - 3d-2d correspondencies
-        points_2d_matches = keypoints_scene[ matches ]
-        points_3d_matches = model_3d_points[ matches ]
+        points_2d_matches, points_3d_matches = [], []
+        for i in range(len(matches)):
+            points_2d_matches.append(kp_frame[ matches[i].queryIdx ].pt)
+            points_3d_matches.append(model_3d_points[matches[i].trainIdx])
 
         # draw outliers
         util.drawPoints( frame, points_2d_matches, color="red")
-        
+
+        cv.imshow('image window', frame)
+        # add wait key. window waits until user presses a key
+        cv.waitKey(0)
+        # and finally destroy/close all open windows
+        cv.destroyAllWindows()
+        print("matches number", len(matches))
+
         # at least 4 matches are required for ransac estimation
         if len(matches) >= 4:
             # step 3 - estimate pose of the camera
