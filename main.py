@@ -63,8 +63,14 @@ if __name__ == "__main__":
     kf = kalman_filter( params=kalman_filter_params( n_states, n_measurements, n_inputs, dt ) )
 
     # init pnp_detection
-    pnp = pnp_detection(camera_params, method="iterative")
-    pnp_est = pnp_detection(camera_params)
+    # demo parameters
+    f = 55
+    sx, sy = 22.3, 14.9
+    width, height = 640, 480
+
+    pnp = pnp_detection( width*f/sx, height*f/sy, width/2, height/2, method="iterative")
+    # est pnp for kalman filter
+    pnp_est = pnp_detection(width*f/sx, height*f/sy, width/2, height/2)
 
     # initalize matcher
     ratio_test = 0.7 # some default value
@@ -106,6 +112,9 @@ if __name__ == "__main__":
         for i in range(len(matches)):
             points_2d_matches.append(kp_frame[ matches[i].queryIdx ].pt)
             points_3d_matches.append(model_3d_points[matches[i].trainIdx])
+        # cast to numpy array
+        points_2d_matches = np.array(points_2d_matches)
+        points_3d_matches = np.array(points_3d_matches)
 
         # draw outliers
         util.drawPoints( frame, points_2d_matches, color="red")
@@ -120,11 +129,11 @@ if __name__ == "__main__":
         # at least 4 matches are required for ransac estimation
         if len(matches) >= 4:
             # step 3 - estimate pose of the camera
-            inliers, reprojection_error = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
+            inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
                 confidence=ransac_confidence,  iterations_count=ransac_iterations, 
                 max_reporjection_error=max_reprojection_error )
 
-            inlier_2d_points = points_2d_matches[ inliers ]
+            inlier_2d_points = points_2d_matches[ inliers.flatten() ]
             # draw the inliers
             util.drawPoints( frame, inlier_2d_points, color="green" )
 
