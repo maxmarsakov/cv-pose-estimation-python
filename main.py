@@ -75,7 +75,7 @@ if __name__ == "__main__":
     # initalize matcher
     ratio_test = 0.7 # some default value
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
-    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", matcher="BF", use_cross_check=False  )
+    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", matcher="FLANN", use_cross_check=False  )
 
     # ransac parameters
     ransac_confidence = 0.99
@@ -119,11 +119,6 @@ if __name__ == "__main__":
         # draw outliers
         util.drawPoints( frame, points_2d_matches, color="red")
 
-        cv.imshow('image window', frame)
-        # add wait key. window waits until user presses a key
-        cv.waitKey(0)
-        # and finally destroy/close all open windows
-        cv.destroyAllWindows()
         print("matches number", len(matches))
 
         # at least 4 matches are required for ransac estimation
@@ -136,6 +131,13 @@ if __name__ == "__main__":
             inlier_2d_points = points_2d_matches[ inliers.flatten() ]
             # draw the inliers
             util.drawPoints( frame, inlier_2d_points, color="green" )
+
+            cv.imshow('image window', frame)
+            # add wait key. window waits until user presses a key
+            cv.waitKey(0)
+            # and finally destroy/close all open windows
+            cv.destroyAllWindows()
+            time.sleep(1)
 
             # step 5
             # kalman filter 
@@ -160,9 +162,19 @@ if __name__ == "__main__":
         pose_points2d.append( pnp_est.backproject3D( (0,l,0) ) ) # y axis
         pose_points2d.append( pnp_est.backproject3D( (0,0,l) ) ) # z axis
 
+        print("drawing object mesh and coordinated axis")
+
         util.draw3DCoordinateAxes(frame, pose_points2d)
 
         util.drawObjectMesh(frame, mesh, pnp_est, color="yellow")
+
+        print("drawing done")
+
+        #cv.imshow('image window', frame)
+        # add wait key. window waits until user presses a key
+        #cv.waitKey(0)
+        # and finally destroy/close all open windows
+        #cv.destroyAllWindows()
 
         # step BONUS: render some 3d figure on the reconstructed mesh
         # s.t ball rolling
@@ -178,9 +190,9 @@ if __name__ == "__main__":
         frame_number += 1
 
         # Our operations on the frame come here
-        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        #gray = cv.cvtColor(frame, cv.point_2d_2)
         # Display the resulting frame
-        cv.imshow('frame', gray)
+        cv.imshow('frame', frame)
         if cv.waitKey(1) == ord('q'):
             break
 

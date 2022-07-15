@@ -1,6 +1,7 @@
 """
 pnp detection class
 """
+from turtle import shape
 import numpy as np
 import cv2 as cv
 
@@ -20,6 +21,8 @@ class pnp_detection:
             ], dtype=np.float32)
         
         self.projection_mat_ = np.zeros((3,4), dtype=np.float64)
+
+        self.R_, self.t_ = None, None
 
     def estimatePoseRansac(self, points_3d_matches, points_2d_matches, \
                 confidence,  iterations_count, max_reporjection_error):
@@ -47,7 +50,10 @@ class pnp_detection:
         # set 
         self.setProjectionMatrix(R,t)
 
-        print(self.projection_mat_)
+        self.R_ = R
+        self.t_ = t
+
+        #print(self.projection_mat_)
 
         return inliers
 
@@ -57,7 +63,7 @@ class pnp_detection:
         returns R and t as
         estimated after pose Ransac
         """
-        pass
+        return self.R_, self.t_
 
     
     def setProjectionMatrix(self, R, t):
@@ -71,5 +77,11 @@ class pnp_detection:
         return backprojected 3d point using 
         local Projection matrix
         """
-        pass
+        print(point)
+        hom_point = np.array([point +tuple([1])]).reshape(4,1)
+        print(hom_point.shape)
+        point_2d = self.projection_mat_ @ hom_point
+        
+        return (int(point_2d[0]/point_2d[2]), int(point_2d[1]/point_2d[2]))
+
     

@@ -100,14 +100,16 @@ def drawObjectMesh(frame, mesh: Mesh, pnp_est: pnp_detection, color="yellow"):
     """ 
     for triangle in mesh.triangles_:
         # backproject 3d points
-        point_2d_0 = pnp_est.backproject3D( triangle[0] )
-        point_2d_1 = pnp_est.backproject3D( triangle[1] )
-        point_2d_2 = pnp_est.backproject3D( triangle[2] )
+        # TODO - bulk pnp backprojection
+        point_2d_0 = pnp_est.backproject3D( mesh.vertices_[triangle[0]] )
+        point_2d_1 = pnp_est.backproject3D( mesh.vertices_[triangle[1]] )
+        point_2d_2 = pnp_est.backproject3D( mesh.vertices_[triangle[2]] )
+        #print("done")
 
         # draw lines
-        cv.line(frame, pnp_est, point_2d_1, COLORS[color], 1)
-        cv.line(frame, pnp_est, point_2d_2, COLORS[color], 1)
-        cv.line(frame, pnp_est, point_2d_0, COLORS[color], 1)
+        cv.line(frame, point_2d_0, point_2d_1, COLORS[color], 1)
+        cv.line(frame, point_2d_1, point_2d_2, COLORS[color], 1)
+        cv.line(frame, point_2d_2, point_2d_0, COLORS[color], 1)
 
 """
 misc

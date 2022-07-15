@@ -43,10 +43,10 @@ class Mesh:
                         start_faces=True
                         continue
                 elif start_faces:
-                    triangles.append( [float(v) for v in line_elems][1:] )
+                    triangles.append( [int(v) for v in line_elems][1:] )
                     triangle_count += 1
                     if triangle_count == max_triangle:
                         # done
                         break
 
-        return Mesh(np.array(vertices), np.array(triangles))
+        return Mesh(np.array(vertices), triangles)
