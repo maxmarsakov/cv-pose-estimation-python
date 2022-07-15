@@ -9,18 +9,20 @@ class kalman_filter:
         params: 
         params - kalman filter state etc
         """
-        pass    
+        self.R_ = None
+        self.t_ = None    
 
     def updateMeasurements(self, R,t):
         """
         params:
         given R,t update local measurments
         """
-        pass
+        self.R_ = R
+        self.t_ = t
 
     def estimate(self):
         """
         return estimated R,t based on measurements
         and parameters
         """
-        pass
+        return self.R_, self.t_
