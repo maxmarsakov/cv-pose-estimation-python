@@ -77,10 +77,10 @@ class pnp_detection:
         return backprojected 3d point using 
         local Projection matrix
         """
-        print(point)
-        hom_point = np.array([point +tuple([1])]).reshape(4,1)
-        print(hom_point.shape)
-        point_2d = self.projection_mat_ @ hom_point
+        p = np.array(point).reshape(3)
+        p = np.hstack([point,np.ones(1)]).reshape(4,1)
+        
+        point_2d = self.cameraMatrix @ self.projection_mat_ @ p
         
         return (int(point_2d[0]/point_2d[2]), int(point_2d[1]/point_2d[2]))
 

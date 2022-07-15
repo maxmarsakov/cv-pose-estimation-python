@@ -73,9 +73,9 @@ if __name__ == "__main__":
     pnp_est = pnp_detection(width*f/sx, height*f/sy, width/2, height/2)
 
     # initalize matcher
-    ratio_test = 0.7 # some default value
+    ratio_test = 0.9 # default value was 0.7, changed to 0.9 for better results
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
-    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", matcher="FLANN", use_cross_check=False  )
+    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", matcher="BF", use_cross_check=False  )
 
     # ransac parameters
     ransac_confidence = 0.99
@@ -127,31 +127,26 @@ if __name__ == "__main__":
             inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
                 confidence=ransac_confidence,  iterations_count=ransac_iterations, 
                 max_reporjection_error=max_reprojection_error )
+            
+            if inliers is None:
+                print("inliers are None")
+            else:
+                inlier_2d_points = points_2d_matches[ inliers.flatten() ]
+                # draw the inliers
+                util.drawPoints( frame, inlier_2d_points, color="green" )
+                # step 5
+                # kalman filter 
+                if len(inliers) >= kalman_min_inliers:
 
-            inlier_2d_points = points_2d_matches[ inliers.flatten() ]
-            # draw the inliers
-            util.drawPoints( frame, inlier_2d_points, color="green" )
+                    R, t = pnp.getRotationTranslation()
+                    # update measurements, according to R and t
+                    measurements = kf.updateMeasurements(R,t)
 
-            cv.imshow('image window', frame)
-            # add wait key. window waits until user presses a key
-            cv.waitKey(0)
-            # and finally destroy/close all open windows
-            cv.destroyAllWindows()
-            time.sleep(1)
+                # estimate R and t from updated kalman filter
+                estimated_R, estimated_t = kf.estimate()
 
-            # step 5
-            # kalman filter 
-            if len(inliers) >= kalman_min_inliers:
-
-                R, t = pnp.getRotationTranslation()
-                # update measurements, according to R and t
-                measurements = kf.updateMeasurements(R,t)
-
-            # estimate R and t from updated kalman filter
-            estimated_R, estimated_t = kf.estimate()
-
-            # step 6 - set estimated projection matrix
-            pnp_est.setProjectionMatrix(estimated_R, estimated_t)
+                # step 6 - set estimated projection matrix
+                pnp_est.setProjectionMatrix(estimated_R, estimated_t)
 
 
         # step 7 - draw pose and coordinate frame
@@ -184,7 +179,8 @@ if __name__ == "__main__":
         fps = 1.0 / (time.time() -start_time)
         print("frame number:", frame_number)
         print("fps rate:", fps)
-        print("inliers count:", len(inliers))
+        if inliers is not None:
+            print("inliers count:", len(inliers))
         print("##################################")
 
         frame_number += 1
