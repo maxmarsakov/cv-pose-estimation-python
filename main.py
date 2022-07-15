@@ -48,6 +48,8 @@ if __name__ == "__main__":
     model_3d_points = model.get3DPoints()
     # load mesh
     mesh = Mesh.loadMesh(mesh_path)
+    # load *roof* mesh
+    roof_mesh, roof_vertices = mesh.loadRoofMesh()
 
     print("Model/Mesh registration is done")
 
@@ -84,7 +86,6 @@ if __name__ == "__main__":
 
     # kalman parameters
     kalman_min_inliers = 30
-
     # frame loop
     frame_number = 0
 
@@ -158,22 +159,21 @@ if __name__ == "__main__":
         pose_points2d.append( pnp_est.backproject3D( (0,0,l) ) ) # z axis
 
         print("drawing object mesh and coordinated axis")
+        # red - X
+        # blue - Y
+        # green - Z
 
         util.draw3DCoordinateAxes(frame, pose_points2d)
 
-        util.drawObjectMesh(frame, mesh, pnp_est, color="yellow")
+        util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
 
-        print("drawing done")
+        #euler_angles = util.rot2euler(estimated_R)
+        #print("eurler_angler", euler_angles)
+        #time.sleep(3)
 
-        #cv.imshow('image window', frame)
-        # add wait key. window waits until user presses a key
-        #cv.waitKey(0)
-        # and finally destroy/close all open windows
-        #cv.destroyAllWindows()
-
-        # step BONUS: render some 3d figure on the reconstructed mesh
-        # s.t ball rolling
-        # TODO
+        # step 8: render some 3d figure on the reconstructed mesh
+        # pyramidic roof
+        util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
 
         # DEBUG information
         fps = 1.0 / (time.time() -start_time)
@@ -186,7 +186,6 @@ if __name__ == "__main__":
         frame_number += 1
 
         # Our operations on the frame come here
-        #gray = cv.cvtColor(frame, cv.point_2d_2)
         # Display the resulting frame
         cv.imshow('frame', frame)
         if cv.waitKey(1) == ord('q'):

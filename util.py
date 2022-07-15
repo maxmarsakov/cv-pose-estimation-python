@@ -93,17 +93,54 @@ def draw3DCoordinateAxes(frame, list_points2d):
 
     cv.circle(frame, origin, radius=RADIUS//2, color=COLORS["black"], thickness=-1)
 
-def drawObjectMesh(frame, mesh: Mesh, pnp_est: pnp_detection, color="yellow"):
+def drawObjectTrianglesCountour(frame, triangles, vertices, pnp_est, colors=[]):
+    """
+    instead of drawing simple object mesh, we draw
+    contour filled triangles
+    """
+    for i,triangle in enumerate(triangles):
+        #if colors[i] == "red":
+            # only one is visible at a time
+            #continue
+        # backproject 3d points
+        # TODO - bulk pnp backprojection
+        vertex1 = vertices[triangle[0]]
+        vertex2 = vertices[triangle[1]]
+        vertex3 = vertices[triangle[2]]
+
+        point_2d_0 = pnp_est.backproject3D( vertex1 )
+        point_2d_1 = pnp_est.backproject3D( vertex2 )
+        point_2d_2 = pnp_est.backproject3D( vertex3 )
+
+        triangle_cnt = np.array( [point_2d_0, point_2d_1, point_2d_2] )
+
+        # draw lines
+        cv.drawContours(frame, [triangle_cnt], 0, COLORS[colors[i]], -1)
+
+def drawObjectMesh(frame, triangles, vertices, pnp_est: pnp_detection, color="yellow", putText=False):
     """
     using object mesh and pnp estimate instance
     renders the mesh on the frame
+    - putText: True if display the text annotations near all the vertices
     """ 
-    for triangle in mesh.triangles_:
+
+    if putText:
+        for vertex in vertices:
+            # draw annotation of the3d model points
+            point_2d = pnp_est.backproject3D( vertex )
+            cv.putText(frame, str(vertex), point_2d,fontFace=cv.FONT_HERSHEY_SIMPLEX, 
+                    fontScale=0.4, color=COLORS["blue"], thickness=1, lineType=cv.LINE_AA)
+
+    for triangle in triangles:
         # backproject 3d points
         # TODO - bulk pnp backprojection
-        point_2d_0 = pnp_est.backproject3D( mesh.vertices_[triangle[0]] )
-        point_2d_1 = pnp_est.backproject3D( mesh.vertices_[triangle[1]] )
-        point_2d_2 = pnp_est.backproject3D( mesh.vertices_[triangle[2]] )
+        vertex1 = vertices[triangle[0]]
+        vertex2 = vertices[triangle[1]]
+        vertex3 = vertices[triangle[2]]
+
+        point_2d_0 = pnp_est.backproject3D( vertex1 )
+        point_2d_1 = pnp_est.backproject3D( vertex2 )
+        point_2d_2 = pnp_est.backproject3D( vertex3 )
         #print("done")
 
         # draw lines

@@ -4,3 +4,4 @@ imutils
 matplotlib
 pyyaml
 jupyter
+sklearn

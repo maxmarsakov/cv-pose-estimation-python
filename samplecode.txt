@@ -1,0 +1,6 @@
+
+        #cv.imshow('image window', frame)
+        # add wait key. window waits until user presses a key
+        #cv.waitKey(0)
+        # and finally destroy/close all open windows
+        #cv.destroyAllWindows()
