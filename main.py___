@@ -97,15 +97,15 @@ if __name__ == "__main__":
     camera_params = util.load_camera_parameters("data/calib.npy")
 
     # init kalman filter
-    useKalmanFilter = True
+    useKalmanFilter = False
 
     if useKalmanFilter:
         n_states = 18 # the number of states
         n_measurements = 6 # the number of measured states
         n_inputs = 0 # the number of control actions
-        dt = 5  #time between measurements (1/FPS)
+        dt = 0.125  #time between measurements (1/FPS)
         # minimal number of inliers required for kalman filter
-        kalman_min_inliers = 10
+        kalman_min_inliers = 50
         kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
 
     # init pnp_detection
@@ -119,19 +119,18 @@ if __name__ == "__main__":
     pnp_est = pnp_detection(width*f/sx, height*f/sy, width/2, height/2)
 
     # initalize matcher
-    ratio_test = 0.70 # default value was 0.7, changed to 0.9 for better results
+    ratio_test = 0.7 # default value was 0.7, changed to 0.9 for better results
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
     num_detected_points = 2000
     matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", 
         nfeatures=num_detected_points, matcher="BF", use_cross_check=False  )
 
     # ransac parameters
-    ransac_confidence = 0.99 # to change
+    ransac_confidence = 0.95 # to change
     ransac_iterations = 500
     
     max_reprojection_error = 2.0 # maximum allowed distance for inlier
 
-    renderObject = True # to render speical object?
     # frame loop
     frame_number = 0
     # store R
@@ -140,7 +139,6 @@ if __name__ == "__main__":
     cap = cv.VideoCapture(video_source)
     # for online steaming
     #cap = cv.VideoCapture(0)
-
     if not cap.isOpened():
         print("Cannot open camera/no video presented.")
         exit()
@@ -161,7 +159,7 @@ if __name__ == "__main__":
         points_2d_matches, points_3d_matches = [], []
         for i in range(len(matches)):
             points_2d_matches.append(kp_frame[ matches[i].queryIdx ].pt)
-            points_3d_matches.append(model_3d_points[ matches[i].trainIdx ])
+            points_3d_matches.append(model_3d_points[matches[i].trainIdx])
         # cast to numpy array
         points_2d_matches = np.array(points_2d_matches)
         points_3d_matches = np.array(points_3d_matches)
@@ -184,8 +182,6 @@ if __name__ == "__main__":
                 inlier_2d_points = points_2d_matches[ inliers.flatten() ]
                 # draw the inliers
                 util.drawPoints( frame, inlier_2d_points, color="green" )
-
-            #time.sleep(3)
            
             # step 5 - KF
             R, t = pnp.getRotationTranslation()
@@ -195,7 +191,8 @@ if __name__ == "__main__":
                 if inliers is not None and len(inliers) >= kalman_min_inliers:
                     good_measurement = True
                     # update measurements in kalman filter, according to R and t
-
+                    #print(R,t)
+      
                     kf.updateMeasurements(R=R,t=t)
                 else:
                     # else estimate using previous measurements
@@ -229,8 +226,7 @@ if __name__ == "__main__":
 
         # step 8: render some 3d figure on the reconstructed mesh
         # pyramidic roof
-        if renderObject:
-            util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
+        util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
 
         # DEBUG information
         fps = 1.0 / (time.time() -start_time)

@@ -4,10 +4,11 @@ robust matcher class
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
+import time
 
 class robust_matcher:
 
-    def __init__(self, ratio_test:float = 0.75, feature_detector:str = "orb", matcher:str="BF", use_cross_check:bool=False):
+    def __init__(self, ratio_test:float = 0.75, feature_detector:str = "orb", nfeatures:int = 2000, matcher:str="BF", use_cross_check:bool=False):
         """
         params:
         ratio_test: float
@@ -18,10 +19,11 @@ class robust_matcher:
         assert matcher == "BF" or matcher == "FLANN"
         assert feature_detector == "ORB" or feature_detector == "SIFT"
 
+        # feature detector
         self.ratio_test_ = ratio_test
         if feature_detector == "ORB":
             # set detector
-            self.feature_detector_ = cv.ORB_create()
+            self.feature_detector_ = cv.ORB_create(nfeatures=nfeatures)
             # set params for matcher
             FLANN_INDEX_LSH = 6
             index_params= dict(algorithm = FLANN_INDEX_LSH,
@@ -30,10 +32,11 @@ class robust_matcher:
                    multi_probe_level = 1) #2
 
         elif feature_detector == "SIFT":
-            self.feature_detector_ = cv.SIFT_create()
+            self.feature_detector_ = cv.SIFT_create(nfeatures=nfeatures)
             # params for the matcher
             FLANN_INDEX_KDTREE = 1
             index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+
 
         # setting matcher
         if matcher == "BF":
