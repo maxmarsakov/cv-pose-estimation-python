@@ -103,9 +103,9 @@ if __name__ == "__main__":
         n_states = 18 # the number of states
         n_measurements = 6 # the number of measured states
         n_inputs = 0 # the number of control actions
-        dt = 5  #time between measurements (1/FPS)
+        dt = 0.125  #time between measurements (1/FPS) # 0.125
         # minimal number of inliers required for kalman filter
-        kalman_min_inliers = 10
+        kalman_min_inliers = 50
         kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
 
     # init pnp_detection
@@ -128,8 +128,8 @@ if __name__ == "__main__":
     # ransac parameters
     ransac_confidence = 0.99 # to change
     ransac_iterations = 500
-    
-    max_reprojection_error = 2.0 # maximum allowed distance for inlier
+    # increasing this parameter made most significance for the results
+    max_reprojection_error = 20.0 # maximum allowed distance for inlier
 
     renderObject = True # to render speical object?
     # frame loop

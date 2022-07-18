@@ -71,15 +71,15 @@ class pnp_detection:
         #print(r, t)
         # some what when signs of the output rotation are flipped
         # between r[0] an r[1], produced wrong results
-        """
+        
         if r[1] > 0:
             # flip the values again
             r[1] = -1*r[1]
             r[0] = -1*r[0]
             #time.sleep(1)
-        #if t[1] < 0: # another fix
-        #    t[1] = -1 * t[1]
-        """
+        if t[1] < 0: # another fix
+            t[1] = -1 * t[1]
+        
     
         R, _ = cv.Rodrigues(r)
         #print(R,t)
