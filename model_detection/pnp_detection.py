@@ -62,12 +62,6 @@ class pnp_detection:
             useExtrinsicGuess=useExstrinsic, iterationsCount=iterations_count, 
             reprojectionError=max_reprojection_error, confidence=confidence, flags=flags )
 
-        self.pre_r_, self.pre_t_ = r, t
-
-        if not retval:
-            time.sleep(3)
-            print("ransac failed")
-
         #print(r, t)
         # some what when signs of the output rotation are flipped
         # between r[0] an r[1], produced wrong results
@@ -79,8 +73,14 @@ class pnp_detection:
             #time.sleep(1)
         if t[1] < 0: # another fix
             t[1] = -1 * t[1]
-        
-    
+
+        self.pre_r_, self.pre_t_ = r, t
+
+        if not retval:
+            time.sleep(3)
+            print("ransac failed")
+
+
         R, _ = cv.Rodrigues(r)
         #print(R,t)
 

@@ -6,7 +6,7 @@ This parts including model detection and 3d reconstruction.
 2022
 
 """
-from pickle import FALSE
+import argparse
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
@@ -18,6 +18,25 @@ from model_detection import robust_matcher
 from model_detection import Mesh
 import time
 
+def parseArgs():
+    parser = argparse.ArgumentParser(
+        description='Welcome to the interactive 3D model reconstruction based on textured object')
+    parser.add_argument('-n', '--npoints', type=int, help="number of Keypoints")
+
+    parser.add_argument('-source_video', '--source_video', type=str, help='')
+    parser.add_argument('-model_path', '--model_path', type=str, help='')
+    parser.add_argument('-mesh_path', '--mesh_path', type=str, help='')
+    parser.add_argument('-kalman', '--use_kalman', action="store_true", help='')
+    parser.add_argument('-kalman_inliers', '--kalman_inliers',  type=int, help='')   
+    parser.add_argument('-detector', '--detector',  type=str, choices=["ORB"], help='')   
+    parser.add_argument('-matcher', '--matcher',  type=str, choices=["BF", "FLANN"], help='')   
+    parser.add_argument('-confidence', '--ransac_confidence',  type=float,  help='')   
+    parser.add_argument('-i', '--ransac_iterations',  type=int,  help='')   
+    parser.add_argument('-repr', '--reprojection_error',  type=float,  help='')   
+
+
+    #parser.add_argument('-t', '--train', action='store_true', help='Train the AI')
+    return parser.parse_args()
 
 def init_kalman_filter(n_states, n_measurements, n_inputs, dt):
     """
@@ -73,11 +92,13 @@ def init_kalman_filter(n_states, n_measurements, n_inputs, dt):
 
 if __name__ == "__main__":
 
+    args = parseArgs()
+
     print("Started....")
     
-    video_source = "./data/test/box.mp4"
-    model_path = "./data/test/cookies_ORB.yml"
-    mesh_path = "./data/test/box.ply"
+    video_source = args.source_video if args.source_video else "./data/test/box.mp4"
+    model_path = args.model_path if args.model_path else "./data/test/cookies_ORB.yml"
+    mesh_path = args.mesh_path if args.mesh_path else "./data/test/box.ply"
     # load the model
     print("Parsing and registering model/mesh....")
 
@@ -97,7 +118,7 @@ if __name__ == "__main__":
     camera_params = util.load_camera_parameters("data/calib.npy")
 
     # init kalman filter
-    useKalmanFilter = True
+    useKalmanFilter = args.use_kalman if args.use_kalman else False
 
     if useKalmanFilter:
         n_states = 18 # the number of states
@@ -105,7 +126,7 @@ if __name__ == "__main__":
         n_inputs = 0 # the number of control actions
         dt = 0.125  #time between measurements (1/FPS) # 0.125
         # minimal number of inliers required for kalman filter
-        kalman_min_inliers = 50
+        kalman_min_inliers = args.kalman_inliers if args.kalman_inliers else 50
         kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
 
     # init pnp_detection
@@ -121,15 +142,18 @@ if __name__ == "__main__":
     # initalize matcher
     ratio_test = 0.70 # default value was 0.7, changed to 0.9 for better results
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
-    num_detected_points = 2000
+    num_detected_points = args.npoints if args.npoints else 2000
+    detector = args.detector if args.detector else "ORB"
+    matcher = args.matcher if args.matcher else "BF"
+
     matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", 
         nfeatures=num_detected_points, matcher="BF", use_cross_check=False  )
 
     # ransac parameters
-    ransac_confidence = 0.99 # to change
-    ransac_iterations = 500
+    ransac_confidence = args.ransac_confidence if args.ransac_confidence else 0.99 # to change
+    ransac_iterations = args.ransac_iterations if args.ransac_iterations else 500
     # increasing this parameter made most significance for the results
-    max_reprojection_error = 20.0 # maximum allowed distance for inlier
+    max_reprojection_error = args.reprojection_error if args.reprojection_error else 20.0 # maximum allowed distance for inlier
 
     renderObject = True # to render speical object?
     # frame loop
