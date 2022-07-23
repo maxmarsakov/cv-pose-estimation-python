@@ -4,6 +4,7 @@ pnp detection class
 from turtle import shape
 import numpy as np
 import cv2 as cv
+import time
 
 class pnp_detection:
 
@@ -18,14 +19,19 @@ class pnp_detection:
                 [f_x, 0, c1],
                 [0, f_y, c2],
                 [0, 0, 1],
-            ], dtype=np.float32)
+            ], dtype=np.float64)
         
         self.projection_mat_ = np.zeros((3,4), dtype=np.float64)
 
         self.R_, self.t_ = None, None
+        # save precomputed values of r and t to
+        # use them in the extrinsic gues
+        self.pre_set_ = False
+
+        self.pre_t_, self.pre_r_ = None, None
 
     def estimatePoseRansac(self, points_3d_matches, points_2d_matches, \
-                confidence,  iterations_count, max_reporjection_error):
+                confidence,  iterations_count, max_reprojection_error):
         """
         points_3d_matches: 3d points of the matches
         points_2d_matches: 2d poitns of the matches
@@ -38,22 +44,50 @@ class pnp_detection:
 
         Sets: local R,t
         """
+
         dist_coeffs = np.zeros((4,1), dtype=np.float64)
-        r = np.zeros((4,1), dtype=np.float64)
-        t = np.zeros((4,1), dtype=np.float64)
+
+        useExstrinsic:bool = False # if set to true, will use prer and pret
+        # as initial guesss
+        if not self.pre_set_:
+            self.pre_set_ = True
+            useExstrinsic = False
+            self.pre_t_ = np.zeros((3,1), dtype=np.float64)
+            self.pre_r_ = np.zeros((3,1), dtype=np.float64)
+
+        flags = cv.SOLVEPNP_EPNP
 
         retval, r,t, inliers = cv.solvePnPRansac(points_3d_matches, points_2d_matches, \
-            self.cameraMatrix, dist_coeffs, r, t, 
-            useExtrinsicGuess=False, iterationsCount=iterations_count, 
-            reprojectionError=max_reporjection_error, confidence=confidence )
+            self.cameraMatrix, dist_coeffs, self.pre_r_, self.pre_t_, 
+            useExtrinsicGuess=useExstrinsic, iterationsCount=iterations_count, 
+            reprojectionError=max_reprojection_error, confidence=confidence, flags=flags )
+
+        #print(r, t)
+        # some what when signs of the output rotation are flipped
+        # between r[0] an r[1], produced wrong results
+        
+        if r[1] > 0:
+            # flip the values again
+            r[1] = -1*r[1]
+            r[0] = -1*r[0]
+            #time.sleep(1)
+        if t[1] < 0: # another fix
+            t[1] = -1 * t[1]
+
+        self.pre_r_, self.pre_t_ = r, t
+
+        if not retval:
+            time.sleep(3)
+            print("ransac failed")
+
+
         R, _ = cv.Rodrigues(r)
-        # set 
+        #print(R,t)
+
         self.setProjectionMatrix(R,t)
 
         self.R_ = R
         self.t_ = t
-
-        #print(self.projection_mat_)
 
         return inliers
 
@@ -70,7 +104,8 @@ class pnp_detection:
         """
         sets projection matrix based on R,t
         """
-        self.projection_mat_ = np.concatenate([R,t], axis=1)
+        
+        self.projection_mat_ = np.concatenate([R,t.reshape(3,1)], axis=1)
 
     def backproject3D(self, point):
         """

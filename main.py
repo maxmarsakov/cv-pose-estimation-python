@@ -1,12 +1,12 @@
 """
 Computer Vision 3D Course Main Project file
 
-This parts including model detection and 3d reconstruction, 
-assuming we have registered the model already.
-model registration C++ code is available here:
-https://github.com/opencv/opencv/blob/4.x/samples/cpp/tutorial_code/calib3d/real_time_pose_estimation/src/main_registration.cpp
+This parts including model detection and 3d reconstruction.
+@authors: 
+2022
 
 """
+import argparse
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
@@ -18,7 +18,27 @@ from model_detection import robust_matcher
 from model_detection import Mesh
 import time
 
-def kalman_filter_params(n_states, n_measurements, n_inputs, dt):
+def parseArgs():
+    parser = argparse.ArgumentParser(
+        description='Welcome to the interactive 3D model reconstruction based on textured object')
+    parser.add_argument('-n', '--npoints', type=int, help="number of Keypoints")
+
+    parser.add_argument('-source_video', '--source_video', type=str, help='')
+    parser.add_argument('-model_path', '--model_path', type=str, help='')
+    parser.add_argument('-mesh_path', '--mesh_path', type=str, help='')
+    parser.add_argument('-kalman', '--use_kalman', action="store_true", help='')
+    parser.add_argument('-kalman_inliers', '--kalman_inliers',  type=int, help='')   
+    parser.add_argument('-detector', '--detector',  type=str, choices=["ORB"], help='')   
+    parser.add_argument('-matcher', '--matcher',  type=str, choices=["BF", "FLANN"], help='')   
+    parser.add_argument('-confidence', '--ransac_confidence',  type=float,  help='')   
+    parser.add_argument('-i', '--ransac_iterations',  type=int,  help='')   
+    parser.add_argument('-repr', '--reprojection_error',  type=float,  help='')   
+
+
+    #parser.add_argument('-t', '--train', action='store_true', help='Train the AI')
+    return parser.parse_args()
+
+def init_kalman_filter(n_states, n_measurements, n_inputs, dt):
     """
     returns predefines kalman filter parameters
     namely, measurement matrix and transition matrix
@@ -29,16 +49,56 @@ def kalman_filter_params(n_states, n_measurements, n_inputs, dt):
     n_inputs: number of control actions
     dt: time between measurements
 
+    returns: instance of kalman filter
     """
-    pass
+    kf = kalman_filter(n_states, n_measurements, n_inputs, dt)
+    # speed
+    dt2 = 0.5 * (dt**2)
+    
+    # n_states X n_states
+    kf.setTransitionMatrix(np.array([ 
+        [1, 0, 0, dt, 0, 0, dt2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, dt, 0, 0, dt2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, dt, 0, 0, dt2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, dt, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0, dt, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, dt, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, dt, 0, 0, dt2, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, dt, 0, 0, dt2, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, dt, 0, 0, dt2],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, dt, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, dt, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, dt],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    ], dtype=np.float64))
+
+    # n_measurements X n_states
+    kf.setMeasurementMatrix(np.array([
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
+    ],dtype=np.float64))
+
+    return kf
+    
 
 if __name__ == "__main__":
 
+    args = parseArgs()
+
     print("Started....")
     
-    video_source = "./data/test/box.mp4"
-    model_path = "./data/test/cookies_ORB.yml"
-    mesh_path = "./data/test/box.ply"
+    video_source = args.source_video if args.source_video else "./data/test/box.mp4"
+    model_path = args.model_path if args.model_path else "./data/test/cookies_ORB.yml"
+    mesh_path = args.mesh_path if args.mesh_path else "./data/test/box.ply"
     # load the model
     print("Parsing and registering model/mesh....")
 
@@ -58,11 +118,16 @@ if __name__ == "__main__":
     camera_params = util.load_camera_parameters("data/calib.npy")
 
     # init kalman filter
-    n_states = 18 # the number of states
-    n_measurements = 6 # the number of measured states
-    n_inputs = 0 # the number of control actions
-    dt = 0.125  #time between measurements (1/FPS)
-    kf = kalman_filter( params=kalman_filter_params( n_states, n_measurements, n_inputs, dt ) )
+    useKalmanFilter = args.use_kalman if args.use_kalman else False
+
+    if useKalmanFilter:
+        n_states = 18 # the number of states
+        n_measurements = 6 # the number of measured states
+        n_inputs = 0 # the number of control actions
+        dt = 0.125  #time between measurements (1/FPS) # 0.125
+        # minimal number of inliers required for kalman filter
+        kalman_min_inliers = args.kalman_inliers if args.kalman_inliers else 50
+        kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
 
     # init pnp_detection
     # demo parameters
@@ -75,23 +140,31 @@ if __name__ == "__main__":
     pnp_est = pnp_detection(width*f/sx, height*f/sy, width/2, height/2)
 
     # initalize matcher
-    ratio_test = 0.9 # default value was 0.7, changed to 0.9 for better results
+    ratio_test = 0.70 # default value was 0.7, changed to 0.9 for better results
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
-    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", matcher="BF", use_cross_check=False  )
+    num_detected_points = args.npoints if args.npoints else 2000
+    detector = args.detector if args.detector else "ORB"
+    matcher = args.matcher if args.matcher else "BF"
+
+    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", 
+        nfeatures=num_detected_points, matcher="BF", use_cross_check=False  )
 
     # ransac parameters
-    ransac_confidence = 0.99
-    ransac_iterations = 500
-    max_reprojection_error = 6.0 # maximum allowed distance for inlier
+    ransac_confidence = args.ransac_confidence if args.ransac_confidence else 0.99 # to change
+    ransac_iterations = args.ransac_iterations if args.ransac_iterations else 500
+    # increasing this parameter made most significance for the results
+    max_reprojection_error = args.reprojection_error if args.reprojection_error else 20.0 # maximum allowed distance for inlier
 
-    # kalman parameters
-    kalman_min_inliers = 30
+    renderObject = True # to render speical object?
     # frame loop
     frame_number = 0
+    # store R
+    prev_R = np.zeros((3,3), dtype=np.float64)
 
     cap = cv.VideoCapture(video_source)
     # for online steaming
     #cap = cv.VideoCapture(0)
+
     if not cap.isOpened():
         print("Cannot open camera/no video presented.")
         exit()
@@ -112,13 +185,15 @@ if __name__ == "__main__":
         points_2d_matches, points_3d_matches = [], []
         for i in range(len(matches)):
             points_2d_matches.append(kp_frame[ matches[i].queryIdx ].pt)
-            points_3d_matches.append(model_3d_points[matches[i].trainIdx])
+            points_3d_matches.append(model_3d_points[ matches[i].trainIdx ])
         # cast to numpy array
         points_2d_matches = np.array(points_2d_matches)
         points_3d_matches = np.array(points_3d_matches)
 
         # draw outliers
         util.drawPoints( frame, points_2d_matches, color="red")
+        # is measurement good for kalman
+        good_measurement = False
 
         print("matches number", len(matches))
 
@@ -127,30 +202,39 @@ if __name__ == "__main__":
             # step 3 - estimate pose of the camera
             inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
                 confidence=ransac_confidence,  iterations_count=ransac_iterations, 
-                max_reporjection_error=max_reprojection_error )
+                max_reprojection_error=max_reprojection_error )
             
-            if inliers is None:
-                print("inliers are None")
-            else:
+            if inliers is not None:
                 inlier_2d_points = points_2d_matches[ inliers.flatten() ]
                 # draw the inliers
                 util.drawPoints( frame, inlier_2d_points, color="green" )
-                # step 5
-                # kalman filter 
-                if len(inliers) >= kalman_min_inliers:
 
-                    R, t = pnp.getRotationTranslation()
-                    # update measurements, according to R and t
-                    measurements = kf.updateMeasurements(R,t)
+            #time.sleep(3)
+           
+            # step 5 - KF
+            R, t = pnp.getRotationTranslation()
+
+            # if number of inliers of kalman is, update measurements\
+            if useKalmanFilter:
+                if inliers is not None and len(inliers) >= kalman_min_inliers:
+                    good_measurement = True
+                    # update measurements in kalman filter, according to R and t
+
+                    kf.updateMeasurements(R=R,t=t)
+                else:
+                    # else estimate using previous measurements
+                    kf.updateMeasurements(prev=True)
 
                 # estimate R and t from updated kalman filter
                 estimated_R, estimated_t = kf.estimate()
-
                 # step 6 - set estimated projection matrix
                 pnp_est.setProjectionMatrix(estimated_R, estimated_t)
+            else:
+                pnp_est.setProjectionMatrix(R, t)
 
 
         # step 7 - draw pose and coordinate frame
+        #if good_measurement:
         pose_points2d = []
         l = 5
         pose_points2d.append( pnp_est.backproject3D( (0,0,0) ) ) # axis center
@@ -167,13 +251,10 @@ if __name__ == "__main__":
 
         util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
 
-        #euler_angles = util.rot2euler(estimated_R)
-        #print("eurler_angler", euler_angles)
-        #time.sleep(3)
-
         # step 8: render some 3d figure on the reconstructed mesh
         # pyramidic roof
-        util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
+        if renderObject:
+            util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
 
         # DEBUG information
         fps = 1.0 / (time.time() -start_time)
@@ -191,17 +272,10 @@ if __name__ == "__main__":
         if cv.waitKey(1) == ord('q'):
             break
 
-
     # When everything done, release the capture
     cap.release()
     cv.destroyAllWindows()
     print("Done")
-        
-
-
-
-
-
 
         
         
