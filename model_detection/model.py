@@ -48,6 +48,7 @@ class Model:
             m = keypoints.size()
             parsed_keypoints = np.zeros( (m) , dtype=np.float32)
             for k in range(m):
+                #print(keypoints.at(k).real())
                 parsed_keypoints[k] = keypoints.at(k).real()
             parsed_keypoints = parsed_keypoints.reshape(int(m)//7, 7)
         s.release()

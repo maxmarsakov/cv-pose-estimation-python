@@ -23,17 +23,19 @@ def parseArgs():
         description='Welcome to the interactive 3D model reconstruction based on textured object')
     parser.add_argument('-n', '--npoints', type=int, help="number of Keypoints")
 
-    parser.add_argument('-source_video', '--source_video', type=str, help='')
-    parser.add_argument('-model_path', '--model_path', type=str, help='')
-    parser.add_argument('-mesh_path', '--mesh_path', type=str, help='')
-    parser.add_argument('-kalman', '--use_kalman', action="store_true", help='')
-    parser.add_argument('-kalman_inliers', '--kalman_inliers',  type=int, help='')   
-    parser.add_argument('-detector', '--detector',  type=str, choices=["ORB"], help='')   
-    parser.add_argument('-matcher', '--matcher',  type=str, choices=["BF", "FLANN"], help='')   
-    parser.add_argument('-confidence', '--ransac_confidence',  type=float,  help='')   
-    parser.add_argument('-i', '--ransac_iterations',  type=int,  help='')   
-    parser.add_argument('-repr', '--reprojection_error',  type=float,  help='')   
-
+    parser.add_argument('-video', '--source_video', type=str, help='')
+    parser.add_argument('-model', '--model_path', type=str, help='')
+    parser.add_argument('-mesh', '--mesh_path', type=str, help='')
+    parser.add_argument('-k', '--use_kalman', action="store_true", help='')
+    parser.add_argument('-in', '--kalman_inliers',  type=int, help='')   
+    parser.add_argument('-d', '--detector',  type=str, choices=["ORB","SIFT"], help='')   
+    parser.add_argument('-m', '--matcher',  type=str, choices=["BF", "FLANN"], help='')   
+    parser.add_argument('-c', '--ransac_confidence',  type=float,  help='')   
+    parser.add_argument('-it', '--ransac_iterations',  type=int,  help='')   
+    parser.add_argument('-e', '--reprojection_error',  type=float,  help='')   
+    parser.add_argument('-v', '--verbose', action="store_true",  help='')   
+    parser.add_argument('-w','--webcam', action="store_true", help='')
+    parser.add_argument('-r','--render', action="store_true", help='')
 
     #parser.add_argument('-t', '--train', action='store_true', help='Train the AI')
     return parser.parse_args()
@@ -95,7 +97,7 @@ if __name__ == "__main__":
     args = parseArgs()
 
     print("Started....")
-    
+
     video_source = args.source_video if args.source_video else "./data/test/box.mp4"
     model_path = args.model_path if args.model_path else "./data/test/cookies_ORB.yml"
     mesh_path = args.mesh_path if args.mesh_path else "./data/test/box.ply"
@@ -120,6 +122,7 @@ if __name__ == "__main__":
     # init kalman filter
     useKalmanFilter = args.use_kalman if args.use_kalman else False
 
+    kalman_min_inliers=0
     if useKalmanFilter:
         n_states = 18 # the number of states
         n_measurements = 6 # the number of measured states
@@ -144,10 +147,10 @@ if __name__ == "__main__":
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
     num_detected_points = args.npoints if args.npoints else 2000
     detector = args.detector if args.detector else "ORB"
-    matcher = args.matcher if args.matcher else "BF"
+    matcher_name = args.matcher if args.matcher else "BF"
 
-    matcher = robust_matcher( ratio_test=ratio_test, feature_detector="ORB", 
-        nfeatures=num_detected_points, matcher="BF", use_cross_check=False  )
+    matcher = robust_matcher( ratio_test=ratio_test, feature_detector=detector, 
+        nfeatures=num_detected_points, matcher=matcher_name, use_cross_check=False  )
 
     # ransac parameters
     ransac_confidence = args.ransac_confidence if args.ransac_confidence else 0.99 # to change
@@ -155,15 +158,32 @@ if __name__ == "__main__":
     # increasing this parameter made most significance for the results
     max_reprojection_error = args.reprojection_error if args.reprojection_error else 20.0 # maximum allowed distance for inlier
 
-    renderObject = True # to render speical object?
+    renderObject = args.render if args.render else False # to render speical object?
     # frame loop
     frame_number = 0
     # store R
     prev_R = np.zeros((3,3), dtype=np.float64)
 
-    cap = cv.VideoCapture(video_source)
-    # for online steaming
-    #cap = cv.VideoCapture(0)
+    print("Args:")
+    print("source_video:",video_source)
+    print("model_path:",model_path)
+    print("mesh_path:",mesh_path)
+    print("use_kalman:",useKalmanFilter)
+    print("kalman_inliers:",kalman_min_inliers)
+    print("detector:",detector)
+    print("matcher:",matcher_name)
+    print("ransac_confidence:",ransac_confidence)
+    print("ransac_iterations:",ransac_iterations)
+    print("reprojection_error:",max_reprojection_error)
+    print("verbose:",args.verbose)
+    print("is webcam", args.webcam is not None)
+    print("render", args.render is not None)
+
+    if args.webcam:
+        cap = cv.VideoCapture(0)
+    else:
+        cap = cv.VideoCapture(video_source)
+    
 
     if not cap.isOpened():
         print("Cannot open camera/no video presented.")
@@ -195,42 +215,48 @@ if __name__ == "__main__":
         # is measurement good for kalman
         good_measurement = False
 
-        print("matches number", len(matches))
+        if args.verbose:
+            print("matches number", len(matches))
 
         # at least 4 matches are required for ransac estimation
+        retval=False
         if len(matches) >= 4:
             # step 3 - estimate pose of the camera
-            inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
+            retval, inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
                 confidence=ransac_confidence,  iterations_count=ransac_iterations, 
                 max_reprojection_error=max_reprojection_error )
-            
-            if inliers is not None:
-                inlier_2d_points = points_2d_matches[ inliers.flatten() ]
-                # draw the inliers
-                util.drawPoints( frame, inlier_2d_points, color="green" )
 
-            #time.sleep(3)
-           
-            # step 5 - KF
-            R, t = pnp.getRotationTranslation()
+        if not retval:
+            if args.verbose:
+                print("ransac failed")
+            continue
 
-            # if number of inliers of kalman is, update measurements\
-            if useKalmanFilter:
-                if inliers is not None and len(inliers) >= kalman_min_inliers:
-                    good_measurement = True
-                    # update measurements in kalman filter, according to R and t
+        if inliers is not None:
+            inlier_2d_points = points_2d_matches[ inliers.flatten() ]
+            # draw the inliers
+            util.drawPoints( frame, inlier_2d_points, color="green" )
 
-                    kf.updateMeasurements(R=R,t=t)
-                else:
-                    # else estimate using previous measurements
-                    kf.updateMeasurements(prev=True)
+       
+        # step 5 - KF
+        R, t = pnp.getRotationTranslation()
 
-                # estimate R and t from updated kalman filter
-                estimated_R, estimated_t = kf.estimate()
-                # step 6 - set estimated projection matrix
-                pnp_est.setProjectionMatrix(estimated_R, estimated_t)
+        # if number of inliers of kalman is, update measurements\
+        if useKalmanFilter:
+            if inliers is not None and len(inliers) >= kalman_min_inliers:
+                good_measurement = True
+                # update measurements in kalman filter, according to R and t
+
+                kf.updateMeasurements(R=R,t=t)
             else:
-                pnp_est.setProjectionMatrix(R, t)
+                # else estimate using previous measurements
+                kf.updateMeasurements(prev=True)
+
+            # estimate R and t from updated kalman filter
+            estimated_R, estimated_t = kf.estimate()
+            # step 6 - set estimated projection matrix
+            pnp_est.setProjectionMatrix(estimated_R, estimated_t)
+        else:
+            pnp_est.setProjectionMatrix(R, t)
 
 
         # step 7 - draw pose and coordinate frame
@@ -242,27 +268,30 @@ if __name__ == "__main__":
         pose_points2d.append( pnp_est.backproject3D( (0,l,0) ) ) # y axis
         pose_points2d.append( pnp_est.backproject3D( (0,0,l) ) ) # z axis
 
-        print("drawing object mesh and coordinated axis")
         # red - X
         # blue - Y
         # green - Z
+        if len(inliers)>=8:
+            util.draw3DCoordinateAxes(frame, pose_points2d)
 
-        util.draw3DCoordinateAxes(frame, pose_points2d)
+            util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
 
-        util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
-
-        # step 8: render some 3d figure on the reconstructed mesh
-        # pyramidic roof
-        if renderObject:
-            util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
+            # step 8: render some 3d figure on the reconstructed mesh
+            # pyramidic roof
+            if renderObject:
+                util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
 
         # DEBUG information
         fps = 1.0 / (time.time() -start_time)
-        print("frame number:", frame_number)
-        print("fps rate:", fps)
-        if inliers is not None:
-            print("inliers count:", len(inliers))
-        print("##################################")
+        # fps
+        cv.putText(frame,f'FPS: {int(fps)}', (50,50), cv.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,0),1,2)
+
+        if args.verbose:
+            print("frame number:", frame_number)
+            print("fps rate:", fps)
+            if inliers is not None:
+                print("inliers count:", len(inliers))
+            print("##################################")
 
         frame_number += 1
 

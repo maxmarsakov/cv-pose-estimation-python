@@ -1,0 +1,11 @@
+# test box
+
+python main.py -n 5000 -e 40 -kalman -kalman_inliers 60
+
+# praline registration
+~/opencv/build/bin/example_tutorial_pnp_registration  -i=/home/maxim/grad/cv-project/data/praline/praline.jpg --mesh=/home/maxim/grad/cv-project/data/praline/praline.ply  --model=/home/maxim/grad/cv-project/data/praline/praline.yml
+
+# pralinee detection
+python main.py -n 5000 -e 60 -c 0.9 --model_path ./data/praline/praline.yml --mesh_path ./data/praline/praline.ply  -w
+
+

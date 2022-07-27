@@ -76,11 +76,6 @@ class pnp_detection:
 
         self.pre_r_, self.pre_t_ = r, t
 
-        if not retval:
-            time.sleep(3)
-            print("ransac failed")
-
-
         R, _ = cv.Rodrigues(r)
         #print(R,t)
 
@@ -89,7 +84,7 @@ class pnp_detection:
         self.R_ = R
         self.t_ = t
 
-        return inliers
+        return retval, inliers
 
 
     def getRotationTranslation(self):
@@ -114,9 +109,11 @@ class pnp_detection:
         """
         p = np.array(point).reshape(3)
         p = np.hstack([point,np.ones(1)]).reshape(4,1)
-        
+
+
         point_2d = self.cameraMatrix @ self.projection_mat_ @ p
-        
-        return (int(point_2d[0]/point_2d[2]), int(point_2d[1]/point_2d[2]))
+
+        last_point=(point_2d[2] if point_2d[2] != 0 else 1.0)
+        return (int(point_2d[0]/last_point), int(point_2d[1]/last_point))
 
     
