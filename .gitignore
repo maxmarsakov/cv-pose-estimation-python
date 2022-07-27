@@ -5,6 +5,8 @@ __pycache__/
 bin/
 lib64/
 lib64
+.vscode/
+.vscode
 
 # C extensions
 *.so
