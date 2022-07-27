@@ -97,6 +97,7 @@ class robust_matcher:
         """
         # compute key points & descriptors from the frame
         frame_kp, frame_des = self.computeKeyPoints_(frame)
+        #print("frame keypoints",len(frame_kp))
 
         # match two image descriptors
         matches = self.matchDescriptors_(frame_des, model_des)

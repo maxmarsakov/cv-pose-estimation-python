@@ -46,6 +46,7 @@ class Model:
         if not s.getNode("keypoints").empty():
             keypoints = s.getNode("keypoints")
             m = keypoints.size()
+            print("keypoints len",int(m)//7)
             parsed_keypoints = np.zeros( (m) , dtype=np.float32)
             for k in range(m):
                 #print(keypoints.at(k).real())

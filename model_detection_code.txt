@@ -1,5 +1,4 @@
-# test box
-
+# test box detection
 python main.py -n 5000 -e 40 -k -in 60 -r
 
 # praline registration
@@ -8,8 +7,17 @@ python main.py -n 5000 -e 40 -k -in 60 -r
 # pralinee detection
 python main.py -n 5000 -e 60 -c 0.9 --model ./data/praline/praline.yml --mesh ./data/praline/praline.ply  -w
 
-# praline high quality
-python main.py -n 5000 -e 60 -c 0.8 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply  -w -r -in 10 -v
+# praline high quality - praline
+python main.py -n 5000 -e 30 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply  -w -r -in 10 
 
+# demo our VIDEO no kalman - praline
+python main.py -n 5000 -e 60 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply   -r -video ./data/praline/video.mp4 
+
+
+# demo our VIDEO  kalman - praline
+python main.py -n 5000 -e 60 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply   -r -video ./data/praline/video.mp4 -k -in 50
+
+# demo real time KALMAN- praline
+python main.py -n 5000 -e 20 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply   -r -w -k -in 10 -ks 0.85
 
 

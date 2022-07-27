@@ -27,6 +27,7 @@ def parseArgs():
     parser.add_argument('-model', '--model_path', type=str, help='')
     parser.add_argument('-mesh', '--mesh_path', type=str, help='')
     parser.add_argument('-k', '--use_kalman', action="store_true", help='')
+    parser.add_argument('-ks','--kalman_sensitivity', type=float, help='')
     parser.add_argument('-in', '--kalman_inliers',  type=int, help='')   
     parser.add_argument('-d', '--detector',  type=str, choices=["ORB","SIFT"], help='')   
     parser.add_argument('-m', '--matcher',  type=str, choices=["BF", "FLANN"], help='')   
@@ -122,6 +123,7 @@ if __name__ == "__main__":
 
     # init kalman filter
     useKalmanFilter = args.use_kalman if args.use_kalman else False
+    kalman_sensitivity = args.kalman_sensitivity if args.kalman_sensitivity is not None else 0.91
 
     kalman_min_inliers=0
     if useKalmanFilter:
@@ -144,7 +146,7 @@ if __name__ == "__main__":
     pnp_est = pnp_detection(width*f/sx, height*f/sy, width/2, height/2)
 
     # initalize matcher
-    ratio_test = 0.70 # default value was 0.7, changed to 0.9 for better results
+    ratio_test = 0.7 # default value was 0.7, changed to 0.9 for better results
     # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
     num_detected_points = args.npoints if args.npoints else 2000
     detector = args.detector if args.detector else "ORB"
@@ -165,9 +167,8 @@ if __name__ == "__main__":
     # store R
     prev_R = np.zeros((3,3), dtype=np.float64)
 
-    video_name = 'project.avi' if not args.output else args.output
-    out_video = cv.VideoWriter(video_name,cv.VideoWriter_fourcc(*'DIVX'), 15, (640,480))
-
+    video_name = 'project.mp4' if not args.output else args.output
+    
     print("Args:")
     print("source_video:",video_source)
     print("model_path:",model_path)
@@ -182,7 +183,8 @@ if __name__ == "__main__":
     print("verbose:",args.verbose)
     print("is webcam:", args.webcam is not None)
     print("render:", args.render is not None)
-    print("video:", video_name)
+    print("video output:", video_name)
+    print("kalman sensitivity:",kalman_sensitivity)
 
     if args.webcam:
         cap = cv.VideoCapture(0)
@@ -194,6 +196,8 @@ if __name__ == "__main__":
         print("Cannot open camera/no video presented.")
         exit()
 
+    out_video = None
+
     while True:
         start_time = time.time()
         # Capture frame-by-frame
@@ -202,6 +206,9 @@ if __name__ == "__main__":
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
             break
+
+        if out_video==None:
+            out_video = cv.VideoWriter(video_name,cv.VideoWriter_fourcc(*'MP4V'), 15, (frame.shape[1],frame.shape[0]))
 
         # step 1 - match the points between the model and the frame
         matches, kp_frame = matcher.fastMatch(frame, keypoints_model, descriptors_model)
@@ -225,43 +232,45 @@ if __name__ == "__main__":
 
         # at least 4 matches are required for ransac estimation
         retval=False
+        inliers=None
         if len(matches) >= 4:
             # step 3 - estimate pose of the camera
             retval, inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
                 confidence=ransac_confidence,  iterations_count=ransac_iterations, 
                 max_reprojection_error=max_reprojection_error )
 
+        inlier_ratio = 0.0
         if not retval:
             if args.verbose:
                 print("ransac failed")
-            continue
-
-        if inliers is not None:
-            inlier_2d_points = points_2d_matches[ inliers.flatten() ]
-            # draw the inliers
-            util.drawPoints( frame, inlier_2d_points, color="green" )
-
-       
-        # step 5 - KF
-        R, t = pnp.getRotationTranslation()
-
-        # if number of inliers of kalman is, update measurements\
-        if useKalmanFilter:
-            if inliers is not None and len(inliers) >= kalman_min_inliers:
-                good_measurement = True
-                # update measurements in kalman filter, according to R and t
-
-                kf.updateMeasurements(R=R,t=t)
-            else:
-                # else estimate using previous measurements
-                kf.updateMeasurements(prev=True)
-
-            # estimate R and t from updated kalman filter
-            estimated_R, estimated_t = kf.estimate()
-            # step 6 - set estimated projection matrix
-            pnp_est.setProjectionMatrix(estimated_R, estimated_t)
         else:
-            pnp_est.setProjectionMatrix(R, t)
+
+            if inliers is not None:
+                inlier_ratio = len(inliers)/len(points_2d_matches)
+                inlier_2d_points = points_2d_matches[ inliers.flatten() ]
+                # draw the inliers
+                util.drawPoints( frame, inlier_2d_points, color="green" )
+
+            # step 5 - KF
+            R, t = pnp.getRotationTranslation()
+
+            # if number of inliers of kalman is, update measurements\
+            if useKalmanFilter:
+                if len(inliers)>kalman_min_inliers and inlier_ratio > kalman_sensitivity:
+                    good_measurement = True
+                    # update measurements in kalman filter, according to R and t
+
+                    kf.updateMeasurements(R=R,t=t)
+                else:
+                    # else estimate using previous measurements
+                    kf.updateMeasurements(prev=True)
+
+                # estimate R and t from updated kalman filter
+                estimated_R, estimated_t = kf.estimate()
+                # step 6 - set estimated projection matrix
+                pnp_est.setProjectionMatrix(estimated_R, estimated_t)
+            else:
+                pnp_est.setProjectionMatrix(R, t)
 
 
         # step 7 - draw pose and coordinate frame
@@ -276,7 +285,7 @@ if __name__ == "__main__":
         # red - X
         # blue - Y
         # green - Z
-        if len(inliers)>=5:
+        if retval and len(inliers)>=5:
             util.draw3DCoordinateAxes(frame, pose_points2d)
 
             util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
@@ -296,6 +305,7 @@ if __name__ == "__main__":
             print("fps rate:", fps)
             if inliers is not None:
                 print("inliers count:", len(inliers))
+                print("inliear ratio:", inlier_ratio)
             print("##################################")
 
         frame_number += 1
