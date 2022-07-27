@@ -36,6 +36,7 @@ def parseArgs():
     parser.add_argument('-v', '--verbose', action="store_true",  help='')   
     parser.add_argument('-w','--webcam', action="store_true", help='')
     parser.add_argument('-r','--render', action="store_true", help='')
+    parser.add_argument('-o','--output',type=str, help='output video')
 
     #parser.add_argument('-t', '--train', action='store_true', help='Train the AI')
     return parser.parse_args()
@@ -127,7 +128,7 @@ if __name__ == "__main__":
         n_states = 18 # the number of states
         n_measurements = 6 # the number of measured states
         n_inputs = 0 # the number of control actions
-        dt = 0.125  #time between measurements (1/FPS) # 0.125
+        dt = 0.5  #time between measurements (1/FPS) # 0.125
         # minimal number of inliers required for kalman filter
         kalman_min_inliers = args.kalman_inliers if args.kalman_inliers else 50
         kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
@@ -164,6 +165,9 @@ if __name__ == "__main__":
     # store R
     prev_R = np.zeros((3,3), dtype=np.float64)
 
+    video_name = 'project.avi' if not args.output else args.output
+    out_video = cv.VideoWriter(video_name,cv.VideoWriter_fourcc(*'DIVX'), 15, (640,480))
+
     print("Args:")
     print("source_video:",video_source)
     print("model_path:",model_path)
@@ -176,8 +180,9 @@ if __name__ == "__main__":
     print("ransac_iterations:",ransac_iterations)
     print("reprojection_error:",max_reprojection_error)
     print("verbose:",args.verbose)
-    print("is webcam", args.webcam is not None)
-    print("render", args.render is not None)
+    print("is webcam:", args.webcam is not None)
+    print("render:", args.render is not None)
+    print("video:", video_name)
 
     if args.webcam:
         cap = cv.VideoCapture(0)
@@ -271,7 +276,7 @@ if __name__ == "__main__":
         # red - X
         # blue - Y
         # green - Z
-        if len(inliers)>=8:
+        if len(inliers)>=5:
             util.draw3DCoordinateAxes(frame, pose_points2d)
 
             util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
@@ -295,11 +300,15 @@ if __name__ == "__main__":
 
         frame_number += 1
 
-        # Our operations on the frame come here
+        out_video.write(frame)
+
         # Display the resulting frame
         cv.imshow('frame', frame)
         if cv.waitKey(1) == ord('q'):
             break
+
+    #save video
+    out_video.release()
 
     # When everything done, release the capture
     cap.release()

@@ -6,6 +6,8 @@ import numpy as np
 import cv2 as cv
 import time
 
+FIX=True
+
 class pnp_detection:
 
     def __init__(self, f_x,f_y, c1, c2, method="iterative"):
@@ -65,20 +67,19 @@ class pnp_detection:
         #print(r, t)
         # some what when signs of the output rotation are flipped
         # between r[0] an r[1], produced wrong results
-        
-        if r[1] > 0:
-            # flip the values again
-            r[1] = -1*r[1]
-            r[0] = -1*r[0]
-            #time.sleep(1)
-        if t[1] < 0: # another fix
-            t[1] = -1 * t[1]
+        if FIX:
+            if r[1] > 0:
+                # flip the values again
+                r[1] = -1*r[1]
+                r[0] = -1*r[0]
+                #time.sleep(1)
+            if t[1] < 0: # another fix
+                t[1] = -1 * t[1]
 
         self.pre_r_, self.pre_t_ = r, t
 
         R, _ = cv.Rodrigues(r)
-        #print(R,t)
-
+        
         self.setProjectionMatrix(R,t)
 
         self.R_ = R
