@@ -4,6 +4,7 @@ __pycache__/
 
 bin/
 lib64/
+lib64
 
 # C extensions
 *.so
@@ -14,7 +15,8 @@ lib64/
 Scripts/
 share/
 *.cfg
-
+etc/
+include/
 
 # non of these
 autograder.py
