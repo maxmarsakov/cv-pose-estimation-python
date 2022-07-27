@@ -130,7 +130,7 @@ if __name__ == "__main__":
         n_states = 18 # the number of states
         n_measurements = 6 # the number of measured states
         n_inputs = 0 # the number of control actions
-        dt = 0.5  #time between measurements (1/FPS) # 0.125
+        dt = 0.125  #time between measurements (1/FPS) # 0.125
         # minimal number of inliers required for kalman filter
         kalman_min_inliers = args.kalman_inliers if args.kalman_inliers else 50
         kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
@@ -277,23 +277,25 @@ if __name__ == "__main__":
         #if good_measurement:
         pose_points2d = []
         l = 5
-        pose_points2d.append( pnp_est.backproject3D( (0,0,0) ) ) # axis center
-        pose_points2d.append( pnp_est.backproject3D( (l,0,0) ) ) # x axis
-        pose_points2d.append( pnp_est.backproject3D( (0,l,0) ) ) # y axis
-        pose_points2d.append( pnp_est.backproject3D( (0,0,l) ) ) # z axis
+        # red - X, blue - Y ,green - Z
+        pnp_obj = pnp_est
+        the_color = "blue"
+        if good_measurement:
+            pnp_obj = pnp
+            the_color = "green"
 
-        # red - X
-        # blue - Y
-        # green - Z
-        if retval and len(inliers)>=5:
-            util.draw3DCoordinateAxes(frame, pose_points2d)
+        pose_points2d.append( pnp_obj.backproject3D( (0,0,0) ) ) # axis center
+        pose_points2d.append( pnp_obj.backproject3D( (l,0,0) ) ) # x axis
+        pose_points2d.append( pnp_obj.backproject3D( (0,l,0) ) ) # y axis
+        pose_points2d.append( pnp_obj.backproject3D( (0,0,l) ) ) # z axis
+        util.draw3DCoordinateAxes(frame, pose_points2d)
 
-            util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_est, color="yellow")
+        util.drawObjectMesh(frame, mesh.triangles_, mesh.vertices_, pnp_obj, color=the_color)
 
-            # step 8: render some 3d figure on the reconstructed mesh
-            # pyramidic roof
-            if renderObject:
-                util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_est, colors=["red", "blue", "green", "yellow"])
+        # step 8: render some 3d figure on the reconstructed mesh
+        # pyramidic roof
+        if renderObject:
+            util.drawObjectTrianglesCountour(frame, roof_mesh, roof_vertices, pnp_obj, colors=["red", "blue", "green", "yellow"])
 
         # DEBUG information
         fps = 1.0 / (time.time() -start_time)
