@@ -159,7 +159,6 @@ def get_rotation_error(R_true: np.ndarray, R: np.ndarray):
     return cv.norm(cv.Rodrigues(-R_true @ R.T))
 
 # Calculates Rotation Matrix given euler angles.
-# https://learnopencv.com/rotation-matrix-to-euler-angles/
 def euler2rot(theta):
     
     R_x = np.array([[1,         0,                  0                   ],

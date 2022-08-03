@@ -17,6 +17,11 @@ from model_detection import pnp_detection
 from model_detection import robust_matcher
 from model_detection import Mesh
 import time
+import glob, os
+from collections import namedtuple
+
+ModelT=namedtuple('ModelT', ['keypoints', 'descriptors', 'points_3d'])
+
 
 def parseArgs():
     parser = argparse.ArgumentParser(
@@ -106,20 +111,34 @@ if __name__ == "__main__":
     # load the model
     print("Parsing and registering model/mesh....")
 
-    model = Model.loadModel(model_path)
-    keypoints_model = model.getKeypoints()
-    descriptors_model = model.getDescriptors()
-    model_3d_points = model.get3DPoints()
+    models=[]
+    pattern=os.path.join(model_path, "*.yml")
+
+    for file in glob.glob(pattern):
+        fpath=file
+        print("loading {} ...".format(fpath))
+        model = Model.loadModel(fpath)
+        keypoints_model = model.getKeypoints()
+        descriptors_model = model.getDescriptors()
+        model_3d_points = model.get3DPoints()
+        # init model
+        models.append(  ModelT(keypoints_model, descriptors_model, model_3d_points) )
+    
     # load mesh
     mesh = Mesh.loadMesh(mesh_path)
     # load *roof* mesh
     roof_mesh, roof_vertices = mesh.loadRoofMesh()
 
-    print("Model/Mesh registration is done")
+    print("Model/Mesh loading is done")
 
     # intrinsic camera parameters
     # fx, fy, cx, cy
     camera_params = util.load_camera_parameters("data/calib.npy")
+    # init pnp_detection
+    # demo parameters
+    f = 45
+    sx, sy = 22.3, 14.9
+    width, height = 640, 480
 
     # init kalman filter
     useKalmanFilter = args.use_kalman if args.use_kalman else False
@@ -130,24 +149,19 @@ if __name__ == "__main__":
         n_states = 18 # the number of states
         n_measurements = 6 # the number of measured states
         n_inputs = 0 # the number of control actions
-        dt = 0.125  #time between measurements (1/FPS) # 0.125
+        dt = 0.012  #time between measurements (1/FPS) # 0.125
         # minimal number of inliers required for kalman filter
         kalman_min_inliers = args.kalman_inliers if args.kalman_inliers else 50
         kf = init_kalman_filter( n_states, n_measurements, n_inputs, dt )
 
-    # init pnp_detection
-    # demo parameters
-    f = 55
-    sx, sy = 22.3, 14.9
-    width, height = 640, 480
-
+    
     pnp = pnp_detection( width*f/sx, height*f/sy, width/2, height/2, method="iterative")
     # est pnp for kalman filter
     pnp_est = pnp_detection(width*f/sx, height*f/sy, width/2, height/2)
 
     # initalize matcher
     ratio_test = 0.7 # default value was 0.7, changed to 0.9 for better results
-    # use cross check = True, may provide better alternative to the ration test in D.Lowe SIFT paper
+    # use cross check = True, may provide better alternative to the ratio test in D.Lowe SIFT paper
     num_detected_points = args.npoints if args.npoints else 2000
     detector = args.detector if args.detector else "ORB"
     matcher_name = args.matcher if args.matcher else "BF"
@@ -164,8 +178,6 @@ if __name__ == "__main__":
     renderObject = args.render if args.render else False # to render speical object?
     # frame loop
     frame_number = 0
-    # store R
-    prev_R = np.zeros((3,3), dtype=np.float64)
 
     video_name = 'project.mp4' if not args.output else args.output
     
@@ -202,6 +214,8 @@ if __name__ == "__main__":
         start_time = time.time()
         # Capture frame-by-frame
         ret, frame = cap.read()
+
+        print(frame.shape)
         # if frame is read correctly ret is True
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
@@ -211,13 +225,23 @@ if __name__ == "__main__":
             out_video = cv.VideoWriter(video_name,cv.VideoWriter_fourcc(*'MP4V'), 15, (frame.shape[1],frame.shape[0]))
 
         # step 1 - match the points between the model and the frame
-        matches, kp_frame = matcher.fastMatch(frame, keypoints_model, descriptors_model)
-    
+        best_matches=[]
+        best_model_i=0
+        best_kp=[]
+        for j,m in enumerate(models):
+            matches, kp_frame = matcher.fastMatch(frame, m.keypoints, m.descriptors)
+            if (len(matches) > len(best_matches)):
+                best_matches=matches
+                best_model_i=j
+                best_kp=kp_frame    
+        #print("best model ind", best_model_i)
+        best_model=models[best_model_i]
+
         # step 2 - 3d-2d correspondencies
         points_2d_matches, points_3d_matches = [], []
-        for i in range(len(matches)):
-            points_2d_matches.append(kp_frame[ matches[i].queryIdx ].pt)
-            points_3d_matches.append(model_3d_points[ matches[i].trainIdx ])
+        for i in range(len(best_matches)):
+            points_2d_matches.append(best_kp[ best_matches[i].queryIdx ].pt)
+            points_3d_matches.append(best_model.points_3d[ best_matches[i].trainIdx ])
         # cast to numpy array
         points_2d_matches = np.array(points_2d_matches)
         points_3d_matches = np.array(points_3d_matches)
@@ -228,24 +252,24 @@ if __name__ == "__main__":
         good_measurement = False
 
         if args.verbose:
-            print("matches number", len(matches))
+            print("matches number", len(best_matches))
 
         # at least 4 matches are required for ransac estimation
         retval=False
-        inliers=None
-        if len(matches) >= 4:
+        inliers=[]
+        if not retval:
+            if args.verbose:
+                print("ransac failed")
+
+        if len(best_matches) >= 4:
             # step 3 - estimate pose of the camera
             retval, inliers = pnp.estimatePoseRansac(  points_3d_matches, points_2d_matches, \
                 confidence=ransac_confidence,  iterations_count=ransac_iterations, 
                 max_reprojection_error=max_reprojection_error )
 
-        inlier_ratio = 0.0
-        if not retval:
-            if args.verbose:
-                print("ransac failed")
-        else:
+            inlier_ratio = 0.0
 
-            if inliers is not None:
+            if len(inliers) > 0:
                 inlier_ratio = len(inliers)/len(points_2d_matches)
                 inlier_2d_points = points_2d_matches[ inliers.flatten() ]
                 # draw the inliers
@@ -256,7 +280,7 @@ if __name__ == "__main__":
 
             # if number of inliers of kalman is, update measurements\
             if useKalmanFilter:
-                if len(inliers)>kalman_min_inliers and inlier_ratio > kalman_sensitivity:
+                if len(inliers)>=kalman_min_inliers and inlier_ratio > kalman_sensitivity:
                     good_measurement = True
                     # update measurements in kalman filter, according to R and t
 
@@ -269,8 +293,7 @@ if __name__ == "__main__":
                 estimated_R, estimated_t = kf.estimate()
                 # step 6 - set estimated projection matrix
                 pnp_est.setProjectionMatrix(estimated_R, estimated_t)
-            else:
-                pnp_est.setProjectionMatrix(R, t)
+
 
 
         # step 7 - draw pose and coordinate frame
@@ -300,7 +323,7 @@ if __name__ == "__main__":
         # DEBUG information
         fps = 1.0 / (time.time() -start_time)
         # fps
-        cv.putText(frame,f'FPS: {int(fps)}', (50,50), cv.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,0),1,2)
+        cv.putText(frame,f'FPS: {int(fps)}', (50,50), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0),1,2)
 
         if args.verbose:
             print("frame number:", frame_number)

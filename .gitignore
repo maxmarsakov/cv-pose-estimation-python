@@ -31,6 +31,8 @@ testParser.py
 util_new.py
 projectParams.py
 
+model_registration/
+
 docs/
 layouts/
 out.txt

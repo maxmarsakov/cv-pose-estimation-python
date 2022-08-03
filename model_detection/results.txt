@@ -1,3 +1,0 @@
-# results with EPNP method
-
-python main.py -n 5000 -repr 40 -kalman -kalman_inliers 60

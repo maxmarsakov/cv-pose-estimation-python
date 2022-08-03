@@ -6,7 +6,8 @@ import numpy as np
 import cv2 as cv
 import time
 
-FIX=True
+FIX_R=False
+FIX_t=False
 
 class pnp_detection:
 
@@ -67,12 +68,13 @@ class pnp_detection:
         #print(r, t)
         # some what when signs of the output rotation are flipped
         # between r[0] an r[1], produced wrong results
-        if FIX:
+        if FIX_R:
             if r[1] > 0:
                 # flip the values again
                 r[1] = -1*r[1]
                 r[0] = -1*r[0]
                 #time.sleep(1)
+        if FIX_t:
             if t[1] < 0: # another fix
                 t[1] = -1 * t[1]
 
@@ -84,6 +86,9 @@ class pnp_detection:
 
         self.R_ = R
         self.t_ = t
+
+        if inliers is None:
+            inliers=[]
 
         return retval, inliers
 

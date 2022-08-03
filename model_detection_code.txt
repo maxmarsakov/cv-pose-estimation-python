@@ -17,14 +17,25 @@ python main.py -n 5000 -e 60 -c 0.95 --model ./data/praline/high.yml --mesh=./da
 # demo our VIDEO  kalman - praline
 python main.py -n 5000 -e 60 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply   -r -video ./data/praline/video.mp4 -k -in 50
 
- python main.py -n 5000 -e 60 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply   -r -video ./data/praline/video.mp4 -k -in 30 -ks 0
+ python main.py -n 5000 -e 60 -c 0.95 --model ./data/praline/ --mesh=./data/praline/praline.ply   -r -video ./data/praline/video.mp4 -k -in 30 -ks 0
 
 
 # demo real time KALMAN- praline
-python main.py -n 5000 -e 20 -c 0.95 --model ./data/praline/high.yml --mesh=./data/praline/praline.ply   -r -w -k -in 10 -ks 0.85
+python main.py -n 5000 -e 20 -c 0.95 --model ./data/praline/models/ --mesh=./data/praline/praline.ply   -r -w -k -in 10 -ks 0.85
 
 # demo with baseline code
 ./example_tutorial_pnp_detection --model=/home/maxim/grad/cv-project/data/praline/high.yml --mesh=/home/maxim/grad/cv-project/data/praline/praline.ply --video=/home/maxim/grad/cv-project/data/praline/video.mp4 -k=4000
 
 # BOX - with fixed kalman filter
 python main.py -k -in 30 -e 6 -c 0.99 -ks 0
+
+# SHIPS real time
+python main.py -n 5000 -e 60 -c 0.95 --model ./data/ships/models/ --mesh=./data/ships/ships.ply   -r -w -k -in 30 -ks 0.0
+
+
+
+# SHIPS
+ python main.py -n 5000 -e 60 -c 0.95 --model ./data/ships/models/ --mesh=./data/ships/ships.ply   -r -video ./data/ships/v1.mp4 -k -in 30 -ks 0
+
+  python main.py -n 5000 -e 60 -c 0.95 --model ./data/ships/models/ --mesh=./data/ships/ships.ply   -r -video ./data/ships/v2.mp4 -k -in 30 -ks 0
+
