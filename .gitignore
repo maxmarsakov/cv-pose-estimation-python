@@ -2,6 +2,7 @@
 __pycache__/
 *$py.class
 
+bckp/
 bin/
 lib64/
 lib64
